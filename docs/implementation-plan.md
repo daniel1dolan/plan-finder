@@ -749,11 +749,11 @@ The container is `max-width: 1200px`, centred, with 16px side padding (24px from
 
 **First visit, step by step:**
 
-1. At 0–4.5s the sky flock wheels in the right 55% of the intro band. On mobile it wheels across the full width.
+1. At 0–5s the sky flock wheels in the right 55% of the intro band, splitting in two and rejoining. On mobile it wheels across the full width.
 2. The example banner is the first thing in the tool, so it's clear these aren't the user's numbers.
 3. The example's answer is already readable in the answer card.
-4. At 4.5–6s the sky flock streams out of the band's lower-right edge, toward the chart. Nine birds stay perched on the horizon hairline.
-5. At about 5.2s the chart flock enters from the top edge of the plot area and roosts by about 8s.
+4. At 5–7.5s the sky flock streams down and to the right through the horizon, toward the chart. Nine birds stay perched on the horizon hairline.
+5. At about 5.7s the chart flock enters from the top edge of the plot area and roosts by about 8.5s.
 6. On mobile, the chart flock arrives when the chart first scrolls at least 40% into view (an IntersectionObserver), with no wait.
 7. The banner disappears instantly on the first edit or on "Start with a blank plan".
 
@@ -929,7 +929,7 @@ The card is `bg-paper`, `rounded-xl`, `shadow-raised`, with 28px 32px padding (2
 - **Chart lines:** no transition (§4 sets `isAnimationActive={false}`).
 - **Summary:** the text swaps instantly. Only the settle wash animates (D5).
 - **Cards:** the entrance in D5. There is no exit animation.
-- **Copy feedback:** on a successful copy, one starling lifts from the button's top-right corner. It is a 10px stroke chevron in `bird`, inside an `aria-hidden` absolutely positioned span. It flies up and right by `translate(36px, -28px)` while fading from 0.8 to 0 over 700ms `--ease-out`, using a CSS keyframe. "Link copied" fades in at the same time.
+- **Copy feedback:** on a successful copy, one starling lifts from the button's top-right corner. It is the flock's gliding starling silhouette (`flyingBirdPath` in `src/flock.ts`), 10px, filled in `bird` and heading up and right, inside an `aria-hidden` absolutely positioned span. It flies up and right by `translate(36px, -28px)` while fading from 0.8 to 0 over 700ms `--ease-out`, using a CSS keyframe. "Link copied" fades in at the same time.
 
 **Reduced motion.** This is global CSS:
 
@@ -959,31 +959,43 @@ export interface FlockParams { minSpeed: number; maxSpeed: number; maxForce: num
 export const SKY: FlockParams   = { minSpeed: 38, maxSpeed: 92,  maxForce: 140, k: 7, sepRadius: 9, wSep: 1.6, wAli: 1.0, wCoh: 0.55, wHome: 0.35, edge: 24 };
 export const ROOST: FlockParams = { minSpeed: 45, maxSpeed: 115, maxForce: 180, k: 7, sepRadius: 7, wSep: 1.6, wAli: 1.0, wCoh: 0.6,  wHome: 0.6,  edge: 12 };
 export interface Flock { n: number; x: Float32Array; y: Float32Array; vx: Float32Array; vy: Float32Array;
-  tx: Float32Array; ty: Float32Array; state: Uint8Array /* 0 fly, 1 landing, 2 perched */; far: Uint8Array; rand: () => number }
+  tx: Float32Array; ty: Float32Array; state: Uint8Array /* 0 fly, 1 landing, 2 perched, 3 gone */; far: Uint8Array;
+  bank: Float32Array /* smoothed turn rate */; rand: () => number }
 export function mulberry32(seed: number): () => number;
 export function createFlock(n: number, seed: number, cx: number, cy: number, radius: number): Flock;
-export function step(f: Flock, dt: number, p: FlockParams, home: { x: number; y: number }, bounds: { x: number; y: number; w: number; h: number }): void;
+// home: one point for the flock, or { x: Float32Array; y: Float32Array } with one per bird
+export function step(f: Flock, dt: number, p: FlockParams, home: Point | Homes, bounds: { x: number; y: number; w: number; h: number } | null): void;
 export function setPerches(f: Flock, xs: ArrayLike<number>, ys: ArrayLike<number>): void; // targets; doesn't change state
 export function land(f: Flock, i: number): void;         // state 0 → 1
 export function liftOff(f: Flock): void;                 // perched → fly, vy = -(40..80), vx ± 30
 export function settled(f: Flock): boolean;
 export function snapToPerches(f: Flock): void;
-export function paths(f: Flock): { near: string; far: string; perched: string };
+export function paths(f: Flock, scale?: number, t?: number /* seconds, drives the wingbeat */): { near: string; far: string; perched: string };
+export function flyingBirdPath(x: number, y: number, angle: number, scale: number): string; // the gliding silhouette
+// The sky timeline, pure so bun test runs it end to end:
+export function createSky(f: Flock, w: number, h: number): Sky;
+export function stepSky(s: Sky, dt: number): boolean;   // false once over
+export function skyFade(s: Sky): number;                 // opacity of the flying birds
+export function finishSky(s: Sky): void;                 // only the nine horizon birds remain, perched
 ```
 
 - **Boids, the topological way.** Each flying bird looks at its **k = 7 nearest** flying neighbours. For each bird, scan all the others and keep the 7 nearest by insertion into fixed-size scratch arrays. That costs O(n²·7) with no allocation.
   - **Separation:** steer away from neighbours closer than `sepRadius`, weighted by 1/d.
   - **Alignment:** steer toward the neighbours' average velocity.
   - **Cohesion:** steer toward their centroid.
-  - **Home:** steer toward the moving attractor.
+  - **Home:** steer toward the moving attractor, or toward each bird's own home when `home` is per bird.
   - **Edge:** a soft force inward within `edge` px of the bounds.
   - Clamp the force to `maxForce` and the speed to `[minSpeed, maxSpeed]`. Use semi-implicit Euler, with `dt` clamped to 1/30s.
+  - **Bank:** each step also smooths the bird's turn rate into `bank` (time constant 0.18s). Only the drawing uses it.
 - **Turning waves.** Every 2.5–4s, picked at random, rotate one bird's velocity by ±40°. Alignment passes the turn through the flock as a ripple, the way information spreads through a real murmuration.
 - **Landing (state 1).** Use an arrival force toward `(tx, ty)` with a slowing radius of 40px, and ignore the boid forces. When the bird is within 0.6px and slower than 5px/s, snap it to the perch and set `state = 2`.
 - **Hard cap.** Any bird not perched 3.2s after a roost sequence starts lerps to its perch over 300ms.
 - **Drawing.** There are three `<path>` elements, so each frame costs three `setAttribute('d', …)` calls and no React renders.
-  - **Flying birds** are a chevron along the unit velocity `v`, with `n` its perpendicular: `M p−3v+3.2n L p+1.5v L p−3v−3.2n`. They are stroked in `bird`, 1.3px wide, with round caps and joins, and no fill. Half the birds are `far`: they are drawn at 0.8× size in a second path at opacity 0.3, while the near path is at 0.6. That gives depth for the cost of one extra path.
-  - **Perched birds** are a filled teardrop about 4.4×2.8px with a tail tick, sitting on the line. Each is flipped left or right by a seeded coin, with seeded x jitter of ±1.5px so the row looks organic. The fill is `bird` at opacity 0.62. The perch y is the line's y minus 3.5px.
+  - **Near birds** are a starling from below: a small filled four-pointed star with pointed, swept wings and a short square tail. It's about 8×4px, oriented along the velocity. It has three wingbeat frames: level, downstroke with the wings forward, and upstroke with the wings raised and foreshortened. They ping-pong at 16 frame changes a second, which is 4 beats a second. A bird flaps while climbing (heading more than 0.3 upward) and in bursts otherwise: the first 38% of each 1.2s cycle, with a per-bird phase from the golden ratio of its index. The rest of the time it glides with its wings fully out and swept back. This "flap–glide" rhythm keeps the flock calm.
+  - **Far birds** (half, seeded) are specks: a small filled crescent across the heading whose width is the wings. Straight and level it shows little, about 2.6px. In a turn it banks and shows the whole wing plane, up to about 7px, scaled by `|bank| / 1.4`. So a turning wave darkens across the flock, as in a real murmuration. A faint 4Hz shimmer stands in for the wingbeat. Far birds are simpler than near ones, which gives depth.
+  - Both are filled in `bird`: near at opacity 0.72, far at 0.34.
+  - **Perched birds** are a filled side-view starling about 12×8px (tail, back, crown, beak, breast and legs), with feet on the perch point. Each is flipped left or right by a seeded coin, with seeded x jitter of ±1.5px so the row looks organic. The fill is `bird` at opacity 0.8. On the chart, the perch y is the line's y minus 1.5px.
+  - The glyphs were chosen on the throwaway branch `prototype/murmuration-variants`, which keeps the alternatives that were compared (the old stroked chevron, a side-view flyer, ribbon, teardrop and funnel flock shapes). The V chevron didn't read as a starling, while the perched silhouette did and stays as it was.
 
 #### Sky flock (`<SkyMurmuration className?: string />`)
 
@@ -993,12 +1005,18 @@ export function paths(f: Flock): { near: string; far: string; perched: string };
   - The band background is `linear-gradient(180deg, var(--color-firstlight) 0%, #EEF0EB 55%, var(--color-mist) 100%)`.
   - The band ends in a 1px `axis` horizon hairline.
 - **Birds:** 150, or 80 below 768px. They start as a seeded cluster with a 30px radius at 60% of the band width, at mid-height.
-- **Attractor:** a slow Lissajous, `x = cx + 0.32w·sin(0.11t)` and `y = cy + 0.25h·sin(0.17t + 1)`.
-- **Timeline:**
-  - 0–4.5s: wheel.
-  - 4.5s: the attractor moves to `(w + 60, h + 40)`. Birds that leave the bounds are removed, and the edge force is off for this phase.
-  - At the same moment, 9 birds are chosen to land on perches spaced evenly along the horizon, across the right 30% of the band.
-  - About 6.2s: the flock has departed and the 9 have perched. Signal departure (`onSkyDeparted` callbacks, a module-level set in `Murmuration.tsx`) and **stop the loop for good**.
+- **Shape: split and rejoin.** The flock follows a slow, flattened Lissajous, `x = w/2 + 0.32w·sin(0.11t)` and `y = h/2 + 0.08h·sin(0.17t + 1)`.
+  - At 0.2s it is cut into two unequal halves (42/58) by geography, along a direction of 0.2 rad. Cutting by index would leave the halves interleaved, and the boids would hold them together.
+  - Each half steers toward its own home, offset either side of the Lissajous point by up to 0.28w. The offset rises and falls as `sin(πk)^0.7`, with `k` going from 0 to 1 over 0.2–3.7s, and turns through 2.4 rad, so the halves part and swap sides. The vertical offset is capped at 0.3h to keep them inside the band.
+  - By 3.7s they share one home again, leaving 1.3s as one flock before it leaves.
+  - Params while wheeling are `SKY` with `maxSpeed 110, maxForce 200, wHome 1.6, wAli 0.8, wCoh 0.5`.
+- **Timeline** (constants in `src/flock.ts`):
+  - 0–5s (`SKY_WHEEL`): split and rejoin.
+  - 5s: everyone streams toward `(0.7w, h + 60)`, down and right through the horizon, with the faster `LEAVE` params: `SKY` with `minSpeed 70, maxSpeed 180, maxForce 260, wHome 1.6, wAli 0.7, wCoh 0.3`. Birds more than 10px outside the bounds are removed, and the edge force is off for this phase.
+  - At the same moment, 9 birds land on perches spaced evenly along the horizon, across the right 30% of the band.
+  - The stream-out ends when the flock has gone and the 9 have perched (usually 6.2–7.2s). It is cut off at 7.5s (`SKY_LEAVE` 2.5s after the wheel). Any stragglers fade out over the last 0.8s (`SKY_FADE`), so the flock never vanishes all at once. Then the loop **stops for good**.
+  - The old exit kept the wheeling params and aimed at `(w + 60, h + 40)`. It left most of the flock in the band at its cutoff, and they vanished in one frame.
+  - The chart flock's arrival is timed from page load, at `SKY_WHEEL` + 0.7s = 5.7s. Nothing is signalled between the two flocks.
 - **Pausing:** pause while the band is less than 10% visible (IntersectionObserver) or the tab is hidden. Paused time doesn't count toward the timeline.
 - **Reduced motion:** render only the 9 perched birds on the horizon, statically. There is never a flight.
 
@@ -1043,9 +1061,9 @@ export function RoostFlock({ perches, signature, plot }: { perches: { x: number;
   // useFlockLoop(active, dt => { step(...); write paths; return !settled(flock) })
   if (reduced === null) return null;
   return <g aria-hidden="true" pointerEvents="none">
-    <path ref={far} fill="none" stroke="var(--color-bird)" strokeOpacity={0.3} strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round" />
-    <path ref={near} fill="none" stroke="var(--color-bird)" strokeOpacity={0.6} strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
-    <path ref={perched} fill="var(--color-bird)" fillOpacity={0.62} />
+    <path ref={far} fill="var(--color-bird)" fillOpacity={0.34} />
+    <path ref={near} fill="var(--color-bird)" fillOpacity={0.72} />
+    <path ref={perched} fill="var(--color-bird)" fillOpacity={0.8} />
   </g>;
 }
 ```
@@ -1055,6 +1073,9 @@ Add `src/flock.test.ts`, with these checks:
 - The same seed gives identical paths.
 - `settled()` becomes true within 200 steps of 1/60s after landing starts.
 - No `NaN` appears after 10,000 steps with random perches.
+- Glide paths are deterministic and finite at every wingbeat frame, including sharp turns and stalled birds.
+- The share button's bird fits its 10px box.
+- The sky timeline, desktop and mobile, over several seeds: the halves separate by more than 0.14w and close up again before the stream-out. It ends by the 7.5s cutoff with at most 3% of birds still flying, and those faded to 0. After `finishSky`, the nine horizon birds are perched and the rest are gone.
 
 ### D7. Copy
 

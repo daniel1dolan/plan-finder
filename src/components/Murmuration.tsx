@@ -1,7 +1,25 @@
 'use client';
 
 import { createRef, useCallback, useEffect, useRef, useState } from 'react';
-import { GONE, ROOST, SKY, createFlock, dropOutside, land, liftOff, paths, setPerches, settled, snapToPerches, step, type Flock } from '@/flock';
+import {
+  HORIZON_PERCHES,
+  ROOST,
+  SKY_WHEEL,
+  createFlock,
+  createSky,
+  finishSky,
+  land,
+  liftOff,
+  paths,
+  setPerches,
+  settled,
+  skyFade,
+  snapToPerches,
+  step,
+  stepSky,
+  type Flock,
+  type Sky,
+} from '@/flock';
 import { useMedia } from './useMedia';
 
 const useReducedMotion = () => useMedia('(prefers-reduced-motion: reduce)');
@@ -61,7 +79,7 @@ function usePathRefs(): PathRefs {
 }
 // Three paths, so a frame is three setAttribute calls and no React render.
 function draw(f: Flock, el: PathRefs, scale = 1) {
-  const p = paths(f, scale);
+  const p = paths(f, scale, performance.now() / 1000);
   el.near.current?.setAttribute('d', p.near);
   el.far.current?.setAttribute('d', p.far);
   el.perched.current?.setAttribute('d', p.perched);
@@ -70,33 +88,29 @@ function draw(f: Flock, el: PathRefs, scale = 1) {
 function BirdPaths({ near, far, perched }: PathRefs) {
   return (
     <>
-      <path ref={far} fill="none" stroke="var(--color-bird)" strokeOpacity={0.3} strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round" />
-      <path ref={near} fill="none" stroke="var(--color-bird)" strokeOpacity={0.6} strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+      <path ref={far} fill="var(--color-bird)" fillOpacity={0.34} />
+      <path ref={near} fill="var(--color-bird)" fillOpacity={0.72} />
       <path ref={perched} fill="var(--color-bird)" fillOpacity={0.8} />
     </>
   );
 }
 
-const HORIZON_PERCHES = 9;
-const SKY_WHEEL = 4.5;
-const SKY_END = 6.5;
 // The chart flock arrives as the sky flock streams out toward it (D4), timed from page load
 // rather than signalled, so nothing can leave it waiting.
-const ROOST_ARRIVES_AT_MS = 5200;
+const ROOST_ARRIVES_AT_MS = SKY_WHEEL * 1000 + 700;
 
-/** The intro's murmuration: wheels for 4.5s, streams out, leaves nine birds on the horizon. */
+/** The intro's murmuration: splits and rejoins for 5s, streams out, leaves nine birds on the horizon. */
 export function SkyMurmuration({ className }: { className?: string }) {
   const svg = useRef<SVGSVGElement>(null);
   const refs = usePathRefs();
   const reduced = useReducedMotion();
-  const sim = useRef<{ f: Flock; t: number; w: number; h: number; leaving: boolean; done: boolean } | null>(null);
+  const sim = useRef<(Sky & { done: boolean }) | null>(null);
   const inView = useRef(false);
 
   const finish = useCallback(() => {
     const s = sim.current;
     if (!s) return;
-    for (let i = HORIZON_PERCHES; i < s.f.n; i++) s.f.state[i] = GONE;
-    snapToPerches(s.f);
+    finishSky(s);
     draw(s.f, refs);
     s.done = true;
   }, [refs]);
@@ -105,22 +119,14 @@ export function SkyMurmuration({ className }: { className?: string }) {
     (dt: number) => {
       const s = sim.current;
       if (!s || s.done) return false;
-      s.t += dt;
-      const { f, w, h } = s;
-      if (s.t < SKY_WHEEL) {
-        step(f, dt, SKY, { x: w / 2 + 0.32 * w * Math.sin(0.11 * s.t), y: h / 2 + 0.25 * h * Math.sin(0.17 * s.t + 1) }, { x: 0, y: 0, w, h });
-      } else {
-        if (!s.leaving) {
-          s.leaving = true;
-          for (let i = 0; i < HORIZON_PERCHES; i++) land(f, i);
-        }
-        step(f, dt, SKY, { x: w + 60, y: h + 40 }, null);
-        if ((dropOutside(f, { x: 0, y: 0, w, h }) === 0 && settled(f)) || s.t > SKY_END) {
-          finish();
-          return false;
-        }
+      if (!stepSky(s, dt)) {
+        finish();
+        return false;
       }
-      draw(f, refs);
+      draw(s.f, refs);
+      const fade = String(skyFade(s));
+      refs.near.current?.style.setProperty('opacity', fade);
+      refs.far.current?.style.setProperty('opacity', fade);
       return true;
     },
     [finish, refs],
@@ -141,7 +147,7 @@ export function SkyMurmuration({ className }: { className?: string }) {
     const x0 = w - Math.max(bandW * 0.3, HORIZON_PERCHES * 22) + 12;
     const xs = Array.from({ length: n }, (_, i) => x0 + ((w - 24 - x0) * Math.min(i, HORIZON_PERCHES - 1)) / (HORIZON_PERCHES - 1));
     setPerches(f, xs, Array.from({ length: n }, () => h - 0.5)); // feet on the horizon hairline
-    sim.current = { f, t: 0, w, h, leaving: false, done: false };
+    sim.current = { ...createSky(f, w, h), done: false };
 
     if (reduced) {
       finish();

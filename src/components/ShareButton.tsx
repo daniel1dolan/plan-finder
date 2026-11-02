@@ -3,8 +3,12 @@
 import { useEffect, useState } from 'react';
 import { COPY } from '@/copy';
 import type { Comparison } from '@/engine/types';
+import { flyingBirdPath } from '@/flock';
 import { shareUrl } from '@/share/codec';
 import { CheckIcon, LinkIcon } from './icons';
+
+// The sky flock's gliding starling, heading the way the copy bird flies (up and right).
+const COPY_BIRD = flyingBirdPath(5, 5, Math.atan2(-28, 36), 1.15);
 
 export function ShareButton({ comparison }: { comparison: Comparison }) {
   const [shown, setShown] = useState(false);
@@ -39,8 +43,8 @@ export function ShareButton({ comparison }: { comparison: Comparison }) {
           </button>
           {status?.copied && (
             <span key={status.n} aria-hidden="true" className="copy-bird pointer-events-none absolute -top-1 right-1 text-bird">
-              <svg width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 6l4-3 4 3" />
+              <svg width={10} height={10} viewBox="0 0 10 10" fill="currentColor">
+                <path d={COPY_BIRD} />
               </svg>
             </span>
           )}

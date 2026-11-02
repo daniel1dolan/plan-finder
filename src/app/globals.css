@@ -1,0 +1,353 @@
+@import "tailwindcss";
+@custom-variant tall (@media (min-width: 1024px) and (min-height: 760px));
+
+@theme inline {
+  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@theme {
+  --color-*: initial;
+  --color-mist: #F3F1EA;          /* page background */
+  --color-paper: #FBFAF6;         /* cards, answer card, chart surface */
+  --color-field: #FFFFFF;         /* input/select background */
+  --color-sunk: #EDEAE1;          /* table header, pressed, placeholders */
+  --color-firstlight: #E3E9E8;    /* top of the intro sky gradient */
+  --color-dawn: #E9EEEC;          /* example banner */
+  --color-ink: #1E2A2F;           /* primary text (starling slate) */
+  --color-ink-2: #46535A;         /* secondary text, labels */
+  --color-muted: #5E686C;         /* hints, axis ticks, captions */
+  --color-hairline: #DAD5C8;      /* card borders, dividers (decorative) */
+  --color-grid: #E6E2D7;          /* chart gridlines */
+  --color-axis: #B9B4A6;          /* chart axis line, dashed add-plan border */
+  --color-edge: #7E847F;          /* input and select borders (non-text, ≥3:1) */
+  --color-focus: #1D6A85;         /* focus ring */
+  --color-sheen: #245A5E;         /* the one accent: primary button, slider fill */
+  --color-sheen-deep: #1C474B;    /* accent hover/pressed */
+  --color-cheapest-wash: #EAF0EC; /* cheapest table row, answer-card settle wash */
+  --color-badge: #DCE8E1;         /* "Cheapest" badge background */
+  --color-notice-wash: #F6EEDF;   /* share-failed notice */
+  --color-error: #A3392A;
+  --color-error-wash: #FDF6F3;    /* invalid field background */
+  --color-error-line: #E3C2B9;    /* invalid card border */
+  --color-success: #2E6A3E;
+  --color-success-wash: #E6F0E6;  /* below-$0 chart area */
+  --color-bird: #2A3439;
+  --color-white: #FFFFFF;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --shadow-card: 0 1px 0 rgb(30 42 47 / 0.04), 0 1px 3px rgb(30 42 47 / 0.06);
+  --shadow-raised: 0 1px 2px rgb(30 42 47 / 0.05), 0 10px 28px -14px rgb(30 42 47 / 0.22);
+  --shadow-pop: 0 14px 34px -10px rgb(30 42 47 / 0.28), 0 2px 6px rgb(30 42 47 / 0.08);
+
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.25, 1);
+}
+
+body {
+  background-color: var(--color-mist);
+  /* Static paper grain; never animated. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+/* Component classes sit in a layer so Tailwind utilities can still override them. */
+/* Light only in v1: keeps native controls light in OS dark mode. */
+:root {
+  color-scheme: light;
+}
+
+@layer components {
+  .num {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  /* Controls */
+  .control {
+    height: 44px;
+    width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-edge);
+    background: var(--color-field);
+    padding: 0 12px;
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 500;
+    color: var(--color-ink);
+    font-variant-numeric: tabular-nums;
+    transition: border-color 120ms var(--ease-out), box-shadow 120ms var(--ease-out);
+  }
+  .control:hover {
+    border-color: var(--color-ink-2);
+  }
+  .control:focus {
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 3px rgb(29 106 133 / 0.22);
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .control[aria-invalid="true"] {
+    border-color: var(--color-error);
+    box-shadow: inset 0 0 0 1px var(--color-error);
+    background: var(--color-error-wash);
+  }
+  .control[aria-invalid="true"]:focus {
+    box-shadow: inset 0 0 0 1px var(--color-error), 0 0 0 3px rgb(29 106 133 / 0.22);
+  }
+  select.control {
+    appearance: none;
+    padding-right: 36px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2346535A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+  .control.has-prefix {
+    padding-left: 26px;
+  }
+  .control.has-suffix {
+    padding-right: 30px;
+  }
+
+  .name-input {
+    width: 100%;
+    background: transparent;
+    font-family: var(--font-serif);
+    font-size: 20px;
+    line-height: 26px;
+    font-weight: 500;
+    color: var(--color-ink);
+    height: 44px; /* touch target */
+    border: 0;
+    border-bottom: 1px dotted var(--color-axis);
+    border-radius: 4px 4px 0 0;
+    padding: 0 0 1px;
+    transition: border-color 120ms var(--ease-out);
+  }
+  .name-input::placeholder {
+    color: var(--color-muted);
+  }
+  /* The underline thickens; the ring (kept for forced-colors) sits 2px out, which the label's
+     margin above clears. */
+  .name-input:focus {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    border-bottom: 2px solid var(--color-focus);
+    padding-bottom: 0;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 16px;
+    border-radius: var(--radius-md);
+    font-size: 15px;
+    font-weight: 600;
+    transition: background-color 120ms var(--ease-out), border-color 120ms var(--ease-out);
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .btn-primary {
+    background: var(--color-sheen);
+    color: var(--color-white);
+  }
+  .btn-primary:hover {
+    background: var(--color-sheen-deep);
+  }
+  .btn-secondary {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    border: 1px solid var(--color-edge);
+  }
+  .btn-secondary:hover {
+    background: var(--color-sunk);
+  }
+  .btn-ghost {
+    color: var(--color-ink-2);
+  }
+  .btn-ghost:hover {
+    background: var(--color-sunk);
+  }
+  :is(button, summary, a, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Popovers */
+  .info-pop {
+    margin: 0;
+    inset: auto;
+    position: fixed;
+    background: var(--color-field);
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-pop);
+    padding: 14px 16px;
+    /* A fixed width, so a panel near the right edge is moved rather than squeezed. */
+    width: min(320px, calc(100vw - 24px));
+    color: var(--color-ink-2);
+    font-size: 15px;
+    line-height: 22px;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 100ms var(--ease-out), transform 100ms var(--ease-out), overlay 100ms allow-discrete,
+      display 100ms allow-discrete;
+  }
+  .info-pop:popover-open {
+    opacity: 1;
+    transform: none;
+    transition-duration: 140ms;
+  }
+  @starting-style {
+    .info-pop:popover-open {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+
+  /* Slider */
+  .care-range {
+    --pct: 0%;
+    appearance: none;
+    width: 100%;
+    height: 44px; /* touch target; the visible track stays 4px */
+    background: transparent;
+    cursor: pointer;
+  }
+  .care-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--color-sheen) var(--pct), var(--color-hairline) var(--pct));
+  }
+  .care-range::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--color-sheen) var(--pct), var(--color-hairline) var(--pct));
+  }
+  .care-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    margin-top: -9px;
+    border-radius: 50%;
+    background: var(--color-field);
+    border: 2px solid var(--color-sheen);
+    box-shadow: var(--shadow-card);
+  }
+  .care-range::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-field);
+    border: 2px solid var(--color-sheen);
+    box-shadow: var(--shadow-card);
+  }
+  .care-range[data-unset="true"]::-webkit-slider-thumb {
+    border: 2px dashed var(--color-edge);
+  }
+  .care-range[data-unset="true"]::-moz-range-thumb {
+    border: 2px dashed var(--color-edge);
+  }
+  .care-range:focus-visible {
+    outline: none;
+  }
+  .care-range:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 3px;
+  }
+  .care-range:focus-visible::-moz-range-thumb {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 3px;
+  }
+  /* Inset to the plot (YAxis width + left margin, right margin) so the thumb centre sits under the
+     expected-care-cost line. */
+  .slider-track {
+    padding-left: calc(62px + 4px - 11px);
+    padding-right: calc(28px - 11px); /* half the widest last x tick, e.g. "$1.2e20" */
+  }
+  @media (min-width: 640px) {
+    .slider-track {
+      padding-left: calc(68px + 4px - 11px);
+    }
+  }
+
+  /* How to read */
+  .how-to-read summary {
+    list-style: none;
+  }
+  .how-to-read summary::-webkit-details-marker {
+    display: none;
+  }
+  .how-to-read .chevron {
+    transition: transform 160ms var(--ease-out);
+  }
+  .how-to-read[open] .chevron {
+    transform: rotate(90deg);
+  }
+  @supports selector(::details-content) {
+    .how-to-read::details-content {
+      opacity: 0;
+      transition: opacity 160ms var(--ease-out), content-visibility 160ms allow-discrete;
+    }
+    .how-to-read[open]::details-content {
+      opacity: 1;
+    }
+  }
+}
+
+/* Motion */
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.card-in {
+  animation: card-in 220ms var(--ease-out);
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.fade-in {
+  animation: fade-in 140ms var(--ease-out);
+}
+@keyframes settle-wash {
+  from {
+    opacity: 1;
+  }
+}
+.settle-wash-layer {
+  background: var(--color-cheapest-wash);
+  opacity: 0;
+  animation: settle-wash 900ms var(--ease-in-out);
+}
+@keyframes copy-bird {
+  from {
+    opacity: 0.8;
+    transform: translate(0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(36px, -28px);
+  }
+}
+.copy-bird {
+  animation: copy-bird 700ms var(--ease-out) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
